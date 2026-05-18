@@ -1,0 +1,530 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MCP Client — Supabase</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #0f1117;
+      color: #e2e8f0;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── Header ── */
+    header {
+      background: #1a1d27;
+      border-bottom: 1px solid #2d3148;
+      padding: 12px 24px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+    header .logo { font-size: 22px; flex-shrink: 0; }
+    header .header-text { display: flex; flex-direction: column; gap: 3px; }
+    header h1 { font-size: 15px; font-weight: 600; color: #fff; line-height: 1; }
+    header h1 span { font-size: 13px; color: #6b7280; font-weight: 400; margin-left: 4px; }
+    header .header-desc {
+      font-size: 12px;
+      color: #6b7280;
+      line-height: 1.4;
+    }
+    header .header-desc strong { color: #a5b4fc; font-weight: 600; }
+    header .header-desc em { color: #34d399; font-style: normal; font-weight: 500; }
+
+    /* ── Tabs ── */
+    .tabs {
+      display: flex;
+      background: #1a1d27;
+      border-bottom: 1px solid #2d3148;
+      padding: 0 24px;
+    }
+    .tab {
+      padding: 12px 20px;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 500;
+      color: #6b7280;
+      border-bottom: 2px solid transparent;
+      transition: all 0.15s;
+      user-select: none;
+    }
+    .tab:hover { color: #e2e8f0; }
+    .tab.active { color: #818cf8; border-bottom-color: #818cf8; }
+
+    /* ── Tab Panels ── */
+    .panel { display: none; flex: 1; flex-direction: column; overflow: hidden; }
+    .panel.active { display: flex; }
+
+    /* ── Chat Panel ── */
+    .chat-messages {
+      flex: 1;
+      overflow-y: auto;
+      padding: 20px 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+    .message {
+      max-width: 75%;
+      padding: 12px 16px;
+      border-radius: 12px;
+      font-size: 14px;
+      line-height: 1.6;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    .message.user {
+      background: #3730a3;
+      align-self: flex-end;
+      border-bottom-right-radius: 4px;
+    }
+    .message.assistant {
+      background: #1e2235;
+      align-self: flex-start;
+      border-bottom-left-radius: 4px;
+      border: 1px solid #2d3148;
+    }
+    .message.system {
+      background: transparent;
+      align-self: center;
+      color: #6b7280;
+      font-size: 12px;
+      text-align: center;
+    }
+    .tool-calls {
+      margin-top: 8px;
+      padding: 8px 12px;
+      background: #0f1117;
+      border-radius: 6px;
+      border-left: 3px solid #818cf8;
+      font-size: 12px;
+      color: #9ca3af;
+    }
+    .tool-calls summary { cursor: pointer; color: #818cf8; font-weight: 500; margin-bottom: 4px; }
+    .tool-calls pre { margin-top: 6px; overflow-x: auto; font-size: 11px; }
+
+    /* ── Chat Input ── */
+    .chat-input-area {
+      padding: 16px 24px;
+      background: #1a1d27;
+      border-top: 1px solid #2d3148;
+      display: flex;
+      gap: 10px;
+      align-items: flex-end;
+    }
+    .chat-input-area textarea {
+      flex: 1;
+      background: #0f1117;
+      border: 1px solid #2d3148;
+      border-radius: 8px;
+      padding: 10px 14px;
+      color: #e2e8f0;
+      font-size: 14px;
+      font-family: inherit;
+      resize: none;
+      min-height: 44px;
+      max-height: 120px;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+    .chat-input-area textarea:focus { border-color: #818cf8; }
+    .chat-input-area textarea::placeholder { color: #4b5563; }
+    .send-btn {
+      background: #4f46e5;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      padding: 10px 18px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      height: 44px;
+      transition: background 0.15s;
+    }
+    .send-btn:hover { background: #4338ca; }
+    .send-btn:disabled { background: #374151; cursor: not-allowed; }
+
+    /* ── Direct Tool Panel ── */
+    .direct-panel {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+    }
+    .tool-sidebar {
+      width: 260px;
+      border-right: 1px solid #2d3148;
+      overflow-y: auto;
+      padding: 16px;
+      background: #1a1d27;
+      flex-shrink: 0;
+    }
+    .tool-sidebar h3 { font-size: 11px; font-weight: 600; color: #6b7280; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 10px; }
+    .tool-item {
+      padding: 8px 10px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 13px;
+      color: #9ca3af;
+      transition: all 0.1s;
+      margin-bottom: 2px;
+    }
+    .tool-item:hover { background: #252840; color: #e2e8f0; }
+    .tool-item.selected { background: #312e81; color: #a5b4fc; }
+    .tool-group { margin-bottom: 16px; }
+    .tool-group-label { font-size: 10px; font-weight: 600; color: #4b5563; text-transform: uppercase; letter-spacing: 0.1em; padding: 4px 10px; }
+
+    .tool-workspace {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .tool-config {
+      padding: 20px 24px;
+      border-bottom: 1px solid #2d3148;
+      overflow-y: auto;
+      max-height: 50%;
+    }
+    .tool-config h2 { font-size: 15px; font-weight: 600; color: #fff; margin-bottom: 4px; }
+    .tool-config p { font-size: 13px; color: #6b7280; margin-bottom: 16px; }
+    .args-editor {
+      background: #0f1117;
+      border: 1px solid #2d3148;
+      border-radius: 8px;
+      padding: 12px;
+      font-family: "Fira Code", "Menlo", monospace;
+      font-size: 13px;
+      color: #a5b4fc;
+      width: 100%;
+      min-height: 100px;
+      resize: vertical;
+      outline: none;
+    }
+    .args-editor:focus { border-color: #818cf8; }
+    .run-btn {
+      margin-top: 12px;
+      background: #059669;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      padding: 10px 20px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    .run-btn:hover { background: #047857; }
+    .run-btn:disabled { background: #374151; cursor: not-allowed; }
+
+    .tool-result {
+      flex: 1;
+      overflow-y: auto;
+      padding: 20px 24px;
+    }
+    .tool-result h3 { font-size: 12px; font-weight: 600; color: #6b7280; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 10px; }
+    .result-box {
+      background: #0f1117;
+      border: 1px solid #2d3148;
+      border-radius: 8px;
+      padding: 14px;
+      font-family: "Fira Code", "Menlo", monospace;
+      font-size: 12px;
+      color: #86efac;
+      white-space: pre-wrap;
+      word-break: break-all;
+      min-height: 80px;
+    }
+    .result-box.error { color: #fca5a5; }
+    .result-box.empty { color: #4b5563; font-style: italic; }
+
+    /* ── Spinner ── */
+    .spinner {
+      display: inline-block;
+      width: 14px; height: 14px;
+      border: 2px solid #374151;
+      border-top-color: #818cf8;
+      border-radius: 50%;
+      animation: spin 0.6s linear infinite;
+      vertical-align: middle;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Scrollbar ── */
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #2d3148; border-radius: 3px; }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo">⚡</div>
+  <div class="header-text">
+    <h1>MCP Client <span>— Supabase</span></h1>
+    <p class="header-desc">
+      Built by <strong>Sarfaraz Shaikh</strong> &nbsp;·&nbsp;
+      Connected to Supabase database &nbsp;·&nbsp;
+      Two modes: <em>MCP Inspector</em> (direct tool calls, no AI) and <em>Claude AI</em> (natural language via Anthropic)
+    </p>
+  </div>
+</header>
+
+<div class="tabs">
+  <div class="tab active" data-tab="chat">🤖 Claude AI</div>
+  <div class="tab" data-tab="direct">🔧 MCP Inspector</div>
+</div>
+
+<!-- ── TAB 1: Chat with Claude ────────────────────────────────────────────── -->
+<div class="panel active" id="panel-chat">
+  <div class="chat-messages" id="chat-messages">
+    <div class="message system">
+      Claude AI is connected to your Supabase MCP server.<br/>
+      Ask anything in plain English — Claude will call the right tools automatically.
+    </div>
+  </div>
+  <div class="chat-input-area">
+    <textarea id="chat-input" placeholder="Ask about your data… e.g. 'How many subscribers do I have?'" rows="1"></textarea>
+    <button class="send-btn" id="send-btn">Send</button>
+  </div>
+</div>
+
+<!-- ── TAB 2: Direct Tool Call ────────────────────────────────────────────── -->
+<div class="panel" id="panel-direct">
+  <div class="direct-panel">
+    <div class="tool-sidebar">
+      <h3>Available Tools</h3>
+      <div id="tool-list"><div class="spinner"></div></div>
+    </div>
+    <div class="tool-workspace">
+      <div class="tool-config" id="tool-config">
+        <h2>Select a tool</h2>
+        <p>Choose a tool from the sidebar to call it directly — no Claude involved.</p>
+      </div>
+      <div class="tool-result">
+        <h3>Result</h3>
+        <div class="result-box empty" id="result-box">Result will appear here…</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  // ── Tab switching ──────────────────────────────────────────────────────────
+  document.querySelectorAll('.tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+      tab.classList.add('active');
+      document.getElementById('panel-' + tab.dataset.tab).classList.add('active');
+    });
+  });
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // TAB 1 — Chat with Claude
+  // ═══════════════════════════════════════════════════════════════════════════
+  const chatMessages = document.getElementById('chat-messages');
+  const chatInput = document.getElementById('chat-input');
+  const sendBtn = document.getElementById('send-btn');
+  const conversationHistory = [];
+
+  function appendMessage(role, text, toolCalls) {
+    const div = document.createElement('div');
+    div.className = `message ${role}`;
+    div.textContent = text;
+
+    if (toolCalls && toolCalls.length > 0) {
+      const details = document.createElement('details');
+      details.className = 'tool-calls';
+      const summary = document.createElement('summary');
+      summary.textContent = `🔧 ${toolCalls.length} tool call${toolCalls.length > 1 ? 's' : ''} made`;
+      details.appendChild(summary);
+      toolCalls.forEach(tc => {
+        const pre = document.createElement('pre');
+        pre.textContent = `${tc.tool}(${JSON.stringify(tc.args, null, 2)})`;
+        details.appendChild(pre);
+      });
+      div.appendChild(details);
+    }
+
+    chatMessages.appendChild(div);
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+  }
+
+  async function sendMessage() {
+    const text = chatInput.value.trim();
+    if (!text) return;
+
+    chatInput.value = '';
+    chatInput.style.height = 'auto';
+    sendBtn.disabled = true;
+
+    appendMessage('user', text, null);
+
+    // Loading indicator
+    const loadingDiv = document.createElement('div');
+    loadingDiv.className = 'message system';
+    loadingDiv.innerHTML = '<span class="spinner"></span> Claude is thinking…';
+    chatMessages.appendChild(loadingDiv);
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+
+    try {
+      const res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: text, history: conversationHistory }),
+      });
+
+      const data = await res.json();
+      loadingDiv.remove();
+
+      if (data.error) {
+        appendMessage('system', '⚠️ Error: ' + data.error, null);
+      } else {
+        conversationHistory.push({ role: 'user', content: text });
+        conversationHistory.push({ role: 'assistant', content: data.reply });
+        appendMessage('assistant', data.reply, data.toolCalls);
+      }
+    } catch (err) {
+      loadingDiv.remove();
+      appendMessage('system', '⚠️ Network error: ' + err.message, null);
+    }
+
+    sendBtn.disabled = false;
+    chatInput.focus();
+  }
+
+  sendBtn.addEventListener('click', sendMessage);
+  chatInput.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+  });
+  chatInput.addEventListener('input', function() {
+    this.style.height = 'auto';
+    this.style.height = Math.min(this.scrollHeight, 120) + 'px';
+  });
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // TAB 2 — Direct Tool Call
+  // ═══════════════════════════════════════════════════════════════════════════
+  let selectedTool = null;
+
+  const TOOL_GROUPS = {
+    'Database': ['db_list_tables', 'db_query', 'db_insert', 'db_update', 'db_delete', 'db_rpc'],
+    'Auth': ['auth_list_users', 'auth_get_user', 'auth_create_user', 'auth_update_user', 'auth_delete_user', 'auth_generate_magic_link'],
+    'Storage': ['storage_list_buckets', 'storage_list_files', 'storage_get_public_url', 'storage_create_signed_url', 'storage_upload_from_url', 'storage_move_file', 'storage_delete_files'],
+  };
+
+  async function loadTools() {
+    const res = await fetch('/api/tools');
+    const data = await res.json();
+    const tools = data.tools || [];
+
+    const list = document.getElementById('tool-list');
+    list.innerHTML = '';
+
+    for (const [group, names] of Object.entries(TOOL_GROUPS)) {
+      const groupDiv = document.createElement('div');
+      groupDiv.className = 'tool-group';
+
+      const label = document.createElement('div');
+      label.className = 'tool-group-label';
+      label.textContent = group;
+      groupDiv.appendChild(label);
+
+      names.forEach(name => {
+        const tool = tools.find(t => t.name === name);
+        if (!tool) return;
+        const item = document.createElement('div');
+        item.className = 'tool-item';
+        item.textContent = name;
+        item.addEventListener('click', () => selectTool(tool, item));
+        groupDiv.appendChild(item);
+      });
+
+      list.appendChild(groupDiv);
+    }
+  }
+
+  function selectTool(tool, el) {
+    document.querySelectorAll('.tool-item').forEach(i => i.classList.remove('selected'));
+    el.classList.add('selected');
+    selectedTool = tool;
+
+    // Build default args JSON from the tool's input schema
+    const props = tool.inputSchema?.properties || {};
+    const defaults = {};
+    for (const [key, schema] of Object.entries(props)) {
+      if (schema.default !== undefined) defaults[key] = schema.default;
+      else if (schema.type === 'string') defaults[key] = '';
+      else if (schema.type === 'number') defaults[key] = 0;
+      else if (schema.type === 'boolean') defaults[key] = false;
+      else if (schema.type === 'array') defaults[key] = [];
+      else if (schema.type === 'object') defaults[key] = {};
+    }
+
+    const config = document.getElementById('tool-config');
+    config.innerHTML = `
+      <h2>${tool.name}</h2>
+      <p>${tool.description}</p>
+      <textarea class="args-editor" id="args-editor">${JSON.stringify(defaults, null, 2)}</textarea>
+      <button class="run-btn" id="run-btn">▶ Run Tool</button>
+    `;
+
+    document.getElementById('run-btn').addEventListener('click', runTool);
+    document.getElementById('result-box').className = 'result-box empty';
+    document.getElementById('result-box').textContent = 'Result will appear here…';
+  }
+
+  async function runTool() {
+    if (!selectedTool) return;
+
+    let args = {};
+    try {
+      args = JSON.parse(document.getElementById('args-editor').value || '{}');
+    } catch {
+      document.getElementById('result-box').className = 'result-box error';
+      document.getElementById('result-box').textContent = '⚠️ Invalid JSON in args editor';
+      return;
+    }
+
+    const runBtn = document.getElementById('run-btn');
+    runBtn.disabled = true;
+    runBtn.innerHTML = '<span class="spinner"></span> Running…';
+
+    const resultBox = document.getElementById('result-box');
+    resultBox.className = 'result-box';
+    resultBox.textContent = 'Loading…';
+
+    try {
+      const res = await fetch('/api/tool', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tool: selectedTool.name, args }),
+      });
+      const data = await res.json();
+
+      if (data.error) {
+        resultBox.className = 'result-box error';
+        resultBox.textContent = '⚠️ ' + data.error;
+      } else {
+        resultBox.className = 'result-box';
+        resultBox.textContent = JSON.stringify(data.result, null, 2);
+      }
+    } catch (err) {
+      resultBox.className = 'result-box error';
+      resultBox.textContent = '⚠️ Network error: ' + err.message;
+    }
+
+    runBtn.disabled = false;
+    runBtn.textContent = '▶ Run Tool';
+  }
+
+  loadTools();
+</script>
+</body>
+</html>
